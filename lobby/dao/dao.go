@@ -9,88 +9,91 @@ import (
 // public
 
 type LobbyDAO struct {
+	daoObj *LobbyDAO
+	joinedPlayers map[string]*model.Player
+	playerChallenges map[string][]string
+	challenges map[string]*model.Challenge
 }
 
-
-func (dao *LobbyDAO) GetPlayer(playerName string) *model.Player {
-	return joinedPlayers[playerName]
+func (self *LobbyDAO) GetPlayer(playerName string) *model.Player {
+	return self.joinedPlayers[playerName]
 }
 
-func (dao *LobbyDAO) SavePlayer(player *model.Player) {
-	joinedPlayers[player.PlayerName] = player
+func (self *LobbyDAO) SavePlayer(player *model.Player) {
+	self.joinedPlayers[player.PlayerName] = player
 	var challenges []string
-	playerChallenges[player.PlayerName] = challenges
+	self.playerChallenges[player.PlayerName] = challenges
 }
 
-func (dao *LobbyDAO) RemovePlayer(playerName string) {
-	delete(joinedPlayers, playerName)
-	delete(playerChallenges, playerName)
+func (self *LobbyDAO) RemovePlayer(playerName string) {
+	delete(self.joinedPlayers, playerName)
+	delete(self.playerChallenges, playerName)
 }
 
-func (dao *LobbyDAO) GetChallenge(challengeID string) *model.Challenge {
-	return challenges[challengeID]
+func (self *LobbyDAO) GetChallenge(challengeID string) *model.Challenge {
+	return self.challenges[challengeID]
 }
 
-func (dao *LobbyDAO) CreateChallenge(challenge *model.Challenge) {
-	challenges[challenge.ChallengeID] = challenge
+func (self *LobbyDAO) CreateChallenge(challenge *model.Challenge) {
+	self.challenges[challenge.ChallengeID] = challenge
 
-	challengeIDs := playerChallenges[challenge.ChallengedPlayer]
+	challengeIDs := self.playerChallenges[challenge.ChallengedPlayer]
 	if ( challengeIDs == nil ) {
 		challengeIDs = []string{}
 	}
 
 	challengeIDs = append( challengeIDs, challenge.ChallengeID )
-	playerChallenges[challenge.ChallengedPlayer] = challengeIDs
+	self.playerChallenges[challenge.ChallengedPlayer] = challengeIDs
 }
 
-func (dao *LobbyDAO) RemoveChallenge(challengeID string) {
+func (self *LobbyDAO) RemoveChallenge(challengeID string) {
 	// remove challenge
-	delete(challenges, challengeID)
+	delete(self.challenges, challengeID)
 
 	// destroy player challenge
-	for k, v := range(playerChallenges) {
-		playerChallenges[k] = filter(v, func(value string) bool {
+	for k, v := range(self.playerChallenges) {
+		self.playerChallenges[k] = filter(v, func(value string) bool {
 			return challengeID != value
 		})
 	}
 }
 
-func (dao *LobbyDAO) GetChallengesFor(challengedPlayer string) []*model.Challenge {
+func (self *LobbyDAO) GetChallengesFor(challengedPlayer string) []*model.Challenge {
 	var thisPlayerChallenges []*model.Challenge
-	challengeIDs := playerChallenges[challengedPlayer]
+	challengeIDs := self.playerChallenges[challengedPlayer]
 	if ( challengeIDs == nil ) {
 		return thisPlayerChallenges
 	}
 
 	thisPlayerChallenges = _mapChallenges(challengeIDs, func(val string) *model.Challenge {
-		return challenges[val]
+		return self.challenges[val]
 	})
 
 	return thisPlayerChallenges
 }
 
-func (dao *LobbyDAO) SaveChallenge(challenge *model.Challenge) {
-	challenges[challenge.ChallengeID] = challenge
+func (self *LobbyDAO) SaveChallenge(challenge *model.Challenge) {
+	self.challenges[challenge.ChallengeID] = challenge
 }
 
-func (dao *LobbyDAO) GetJoinedPlayers() []string {
+func (self *LobbyDAO) GetJoinedPlayers() []string {
 	keys := []string{}
-	for k := range joinedPlayers {
+	for k := range self.joinedPlayers {
 		keys = append(keys, k)
 	}
 
 	return keys
 }
 
-func (dao *LobbyDAO) SetChallengeMatchID(challengeID, matchID string) {
-	challenge := dao.GetChallenge(challengeID)
+func (self *LobbyDAO) SetChallengeMatchID(challengeID, matchID string) {
+	challenge := self.GetChallenge(challengeID)
 	if ( challenge != nil ) {
 		challenge.MatchID = matchID
 	}
 }
 
-func (dao *LobbyDAO) GetMatchIDForChallenge(challengeID string) string {
-	challenge := dao.GetChallenge(challengeID)
+func (self *LobbyDAO) GetMatchIDForChallenge(challengeID string) string {
+	challenge := self.GetChallenge(challengeID)
 	if ( challenge == nil ) {
 		return ""
 	}
@@ -99,10 +102,11 @@ func (dao *LobbyDAO) GetMatchIDForChallenge(challengeID string) string {
 
 // entry point
 func NewLobbyDAO() *LobbyDAO {
-	joinedPlayers = make(map[string]*model.Player)
-	playerChallenges = make(map[string][]string)
-	challenges = make(map[string]*model.Challenge)
-	daoObj = &(LobbyDAO{})
+	daoObj := &(LobbyDAO{})
+
+	daoObj.joinedPlayers = make(map[string]*model.Player)
+	daoObj.playerChallenges = make(map[string][]string)
+	daoObj.challenges = make(map[string]*model.Challenge)
 	return daoObj
 }
 
@@ -110,10 +114,7 @@ func NewLobbyDAO() *LobbyDAO {
 // private
 
 // state
-var daoObj *LobbyDAO
-var joinedPlayers map[string]*model.Player
-var playerChallenges map[string][]string
-var challenges map[string]*model.Challenge
+
 
 // helpers
 func filter(vs []string, f func(string) bool) []string {
