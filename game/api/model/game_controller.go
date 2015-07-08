@@ -1,36 +1,49 @@
-package api
+package model
 
 import (
-	"github.com/rachoac/tictactoe-go/game/api/model"
 	"encoding/json"
 )
 
 type GameController struct {
-	board *model.TicTacToeBoard
+	board *TicTacToeBoard
 	turnOwner string
 	playerOne string
 	playerTwo string
 }
 
 type Data struct {
-	playerOne string
-	playerTwo string
-	board []byte
-	turnOwner string
+	PlayerOne string `json:"playerOne"`
+	PlayerTwo string `json:"playerTwo"`
+	Board []byte `json:"board"`
+	TurnOwner string `json:"turnOwner"`
 }
 
-func (self *GameController) GetBoardData() []byte {
+func (self *GameController) GetBoardData() ([]byte, error) {
 	if ( self.board	== nil ) {
-		self.board = model.NewBoard()
+		self.board = NewBoard()
 	}
-	data := Data{
-		self.playerOne, self.playerTwo, self.board.Serialize(), self.turnOwner }
-	return json.Marshal(data)
+	serialized, failure := self.board.Serialize()
+	if ( failure != nil ) {
+		return nil, failure
+	}
+
+	data := &Data{
+		PlayerOne : self.playerOne,
+		PlayerTwo: self.playerTwo,
+		Board : serialized,
+		TurnOwner : self.turnOwner }
+
+	var toReturn, err = json.Marshal(data)
+
+	if ( err != nil  ) {
+		return nil, err
+	}
+	return toReturn, err
 }
 
 func (self *GameController) SetBoardData(jsonBytes []byte) {
 	if ( self.board	== nil ) {
-		self.board = model.NewBoard()
+		self.board = NewBoard()
 	}
 	if ( jsonBytes == nil || len(jsonBytes) < 1 ) {
 		return
@@ -39,27 +52,27 @@ func (self *GameController) SetBoardData(jsonBytes []byte) {
 	var data Data
 	json.Unmarshal(jsonBytes, &data)
 
-	if ( data.board != nil ) {
-		self.board.Deserialize(data.board)
+	if ( data.Board != nil ) {
+		self.board.Deserialize(data.Board)
 	}
 
-	self.playerOne = data.playerOne
-	self.playerTwo = data.playerTwo
-	self.turnOwner = data.turnOwner
+	self.playerOne = data.PlayerOne
+	self.playerTwo = data.PlayerTwo
+	self.turnOwner = data.TurnOwner
 }
 
 func (self *GameController) Create(playerOne, playerTwo string) {
 	self.playerOne = playerOne
 	self.playerTwo = playerTwo
 	if ( self.board == nil ) {
-		self.board = model.NewBoard()
+		self.board = NewBoard()
 	} else {
 		self.board.Reset()
 	}
 }
 
-func (self *GameController) GetTurnOwner() {
-	if ( self.turnOwner == nil ) {
+func (self *GameController) GetTurnOwner() string {
+	if ( self.turnOwner == "" ) {
 		self.turnOwner = self.playerOne
 	}
 
@@ -67,7 +80,12 @@ func (self *GameController) GetTurnOwner() {
 }
 
 func (self *GameController) DoMove( x, y int ) error {
-	return self.board.PerformMove( self.GetTurnOwner(), x, y )
+	failure := self.board.PerformMove( self.GetTurnOwner(), x, y )
+	if ( failure != nil ) {
+		return failure
+	}
+	nextTurn(self)
+	return nil
 }
 
 func (self *GameController) GetState() string {
@@ -92,8 +110,8 @@ func NewGameController() *GameController {
 // private
 
 
-func (self *GameController) nextTurn() {
-	if ( self.turnOwner == nil ) {
+func nextTurn(self *GameController) {
+	if ( self.turnOwner == "" ) {
 		self.turnOwner = self.playerOne
 		return
 	}

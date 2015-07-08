@@ -11,20 +11,22 @@ import (
 //	"fmt"
 )
 
-type LobbyAPI struct {}
+type LobbyAPI struct {
+	lobbyDAO *dao.LobbyDAO
+}
 
 /**
  * Join a named player to the lobby, indicating that they are ready for a game challenge
  * @param playerName
  * @return
  */
-func (api *LobbyAPI) JoinPlayer(playerName string) *model.Player {
-	player := lobbyDAO.GetPlayer(playerName)
+func (self *LobbyAPI) JoinPlayer(playerName string) *model.Player {
+	player := self.lobbyDAO.GetPlayer(playerName)
 	if ( player == nil ) {
 		player = model.NewPlayer()
 		player.PlayerName = playerName;
 		player.JoinedTs = util.Now()
-		lobbyDAO.SavePlayer(player)
+		self.lobbyDAO.SavePlayer(player)
 	}
 
 	return player
@@ -35,8 +37,8 @@ func (api *LobbyAPI) JoinPlayer(playerName string) *model.Player {
  * @param playerName
  * @return
  */
-func (api *LobbyAPI) IsPlayerJoined(playerName string) bool {
-	player := lobbyDAO.GetPlayer(playerName)
+func (self *LobbyAPI) IsPlayerJoined(playerName string) bool {
+	player := self.lobbyDAO.GetPlayer(playerName)
 	return player != nil
 }
 
@@ -44,8 +46,8 @@ func (api *LobbyAPI) IsPlayerJoined(playerName string) bool {
  * Remove a named player from the lobby. This destroys any pending game challenges
  * @param playerName
  */
-func (api *LobbyAPI) RemovePlayer(playerName string) {
-	lobbyDAO.RemovePlayer(playerName)
+func (self *LobbyAPI) RemovePlayer(playerName string) {
+	self.lobbyDAO.RemovePlayer(playerName)
 }
 
 /**
@@ -55,19 +57,19 @@ func (api *LobbyAPI) RemovePlayer(playerName string) {
  * @param challengedPlayer
  * @return
  */
-func (api *LobbyAPI) CreateChallenge(challengerPlayer, challengedPlayer string) (*model.Challenge, error) {
-	failure := validatePlayer(challengerPlayer)
+func (self *LobbyAPI) CreateChallenge(challengerPlayer, challengedPlayer string) (*model.Challenge, error) {
+	failure := validatePlayer(self, challengerPlayer)
 	if ( failure != nil ) {
 		return nil, failure
 	}
 
-	failure = validatePlayer(challengedPlayer)
+	failure = validatePlayer(self, challengedPlayer)
 	if ( failure != nil ) {
 		return nil, failure
 	}
 
 	challengeID := challengerPlayer + "_" + challengedPlayer
-	challenge := lobbyDAO.GetChallenge(challengeID)
+	challenge := self.lobbyDAO.GetChallenge(challengeID)
 	if ( challenge != nil ) {
 		// challenge already exists
 		return nil, errors.New("Challenge already exists: " + challengeID)
@@ -79,7 +81,7 @@ func (api *LobbyAPI) CreateChallenge(challengerPlayer, challengedPlayer string) 
 	challenge.ChallengerPlayer = challengerPlayer
 	challenge.ChallengeTs = util.Now()
 
-	lobbyDAO.CreateChallenge(challenge)
+	self.lobbyDAO.CreateChallenge(challenge)
 
 	return challenge, nil
 }
@@ -89,13 +91,13 @@ func (api *LobbyAPI) CreateChallenge(challengerPlayer, challengedPlayer string) 
  * @param challengedPlayer
  * @return
  */
-func (api *LobbyAPI) GetChallengeFor(challengedPlayer string) (*model.Challenge, error) {
-	failure := validatePlayer(challengedPlayer)
+func (self *LobbyAPI) GetChallengeFor(challengedPlayer string) (*model.Challenge, error) {
+	failure := validatePlayer(self, challengedPlayer)
 	if ( failure != nil ) {
 		return nil, failure
 	}
 
-	challenges := lobbyDAO.GetChallengesFor( challengedPlayer )
+	challenges := self.lobbyDAO.GetChallengesFor( challengedPlayer )
 	if ( len(challenges) < 1 ) {
 		return nil, nil
 	}
@@ -107,7 +109,7 @@ func (api *LobbyAPI) GetChallengeFor(challengedPlayer string) (*model.Challenge,
 		}
 
 		if ( challenge.IsChallengeExpired() ) {
-			apiObj.RemoveExpiredChallenge(challenge.ChallengeID)
+			self.RemoveExpiredChallenge(challenge.ChallengeID)
 			continue
 		}
 
@@ -117,8 +119,8 @@ func (api *LobbyAPI) GetChallengeFor(challengedPlayer string) (*model.Challenge,
 	return nil, nil
 }
 
-func (api *LobbyAPI) GetChallenge(challengeID string) *model.Challenge {
-	return lobbyDAO.GetChallenge(challengeID)
+func (self *LobbyAPI) GetChallenge(challengeID string) *model.Challenge {
+	return self.lobbyDAO.GetChallenge(challengeID)
 }
 
 /**
@@ -126,15 +128,15 @@ func (api *LobbyAPI) GetChallenge(challengeID string) *model.Challenge {
  * @param challengeID
  * @return
  */
-func (api *LobbyAPI) RemoveExpiredChallenge(challengeID string) bool {
-	challenge := lobbyDAO.GetChallenge( challengeID )
+func (self *LobbyAPI) RemoveExpiredChallenge(challengeID string) bool {
+	challenge := self.lobbyDAO.GetChallenge( challengeID )
 	if ( challenge == nil ) {
 		return false
 	}
 
 	if ( challenge.IsChallengeExpired() ) {
 		log.Info("Challenge " + challengeID + " expired, removing")
-		lobbyDAO.RemoveChallenge( challengeID )
+		self.lobbyDAO.RemoveChallenge( challengeID )
 	}
 
 	return true
@@ -146,8 +148,8 @@ func (api *LobbyAPI) RemoveExpiredChallenge(challengeID string) bool {
  * @param challengeID
  * @return
  */
-func (api *LobbyAPI) IsChallengeAccepted(challengeID string) bool {
-	challenge := lobbyDAO.GetChallenge( challengeID )
+func (self *LobbyAPI) IsChallengeAccepted(challengeID string) bool {
+	challenge := self.lobbyDAO.GetChallenge( challengeID )
 	if ( challenge == nil ) {
 		return false
 	}
@@ -160,15 +162,15 @@ func (api *LobbyAPI) IsChallengeAccepted(challengeID string) bool {
  * @param challengeID
  * @return String matchID if successful match is created
  */
-func (api *LobbyAPI) AcceptChallenge(challengeID string) (string, error) {
-	challenge := lobbyDAO.GetChallenge( challengeID )
+func (self *LobbyAPI) AcceptChallenge(challengeID string) (string, error) {
+	challenge := self.lobbyDAO.GetChallenge( challengeID )
 	if ( challenge == nil ) {
 		return "", errors.New("Challenge " + challengeID + " not found")
 	}
 
 	challenge.ChallengeStatus = "accepted"
 
-	lobbyDAO.SaveChallenge(challenge)
+	self.lobbyDAO.SaveChallenge(challenge)
 
 	client := gameclient.NewGameClient("http://localhost:9092");
 
@@ -178,7 +180,7 @@ func (api *LobbyAPI) AcceptChallenge(challengeID string) (string, error) {
 		return "", failure;
 	}
 
-	lobbyDAO.SetChallengeMatchID( challengeID, matchID )
+	self.lobbyDAO.SetChallengeMatchID( challengeID, matchID )
 
 	return matchID, nil
 }
@@ -188,14 +190,14 @@ func (api *LobbyAPI) AcceptChallenge(challengeID string) (string, error) {
  * @param challengeID
  * @return
  */
-func (api *LobbyAPI) RejectChallenge(challengeID string) bool {
-	challenge := lobbyDAO.GetChallenge( challengeID )
+func (self *LobbyAPI) RejectChallenge(challengeID string) bool {
+	challenge := self.lobbyDAO.GetChallenge( challengeID )
 	if ( challenge == nil ) {
 		return true
 	}
 
 	challenge.ChallengeStatus = "rejected"
-	lobbyDAO.SaveChallenge(challenge)
+	self.lobbyDAO.SaveChallenge(challenge)
 	return true
 }
 
@@ -203,34 +205,34 @@ func (api *LobbyAPI) RejectChallenge(challengeID string) bool {
  * Destroys the named challenge
  * @param challengeID
  */
-func (api *LobbyAPI) RemoveChallenge(challengeID string) {
-	lobbyDAO.RemoveChallenge(challengeID)
+func (self *LobbyAPI) RemoveChallenge(challengeID string) {
+	self.lobbyDAO.RemoveChallenge(challengeID)
 }
 
 /**
  * Provides a list of players currently in the lobby and accepting games
  * @return
  */
-func (api *LobbyAPI) GetJoinedPlayers() []*model.Player {
+func (self *LobbyAPI) GetJoinedPlayers() []*model.Player {
 	var players []*model.Player = []*model.Player{}
 
-	for _, playerID := range lobbyDAO.GetJoinedPlayers() {
-		players = append( players, lobbyDAO.GetPlayer(playerID) )
+	for _, playerID := range self.lobbyDAO.GetJoinedPlayers() {
+		players = append( players, self.lobbyDAO.GetPlayer(playerID) )
 	}
 	return players
 }
 
-func (api *LobbyAPI) GetMatchIDForChallenge(challengeID string) string {
-	return lobbyDAO.GetMatchIDForChallenge(challengeID)
+func (self *LobbyAPI) GetMatchIDForChallenge(challengeID string) string {
+	return self.lobbyDAO.GetMatchIDForChallenge(challengeID)
 }
 
 // entrypoint
 func NewLobbyAPI(_dao ... *dao.LobbyDAO) *LobbyAPI {
-	apiObj = &(LobbyAPI{})
+	apiObj := &(LobbyAPI{})
 	if ( len(_dao) > 0 ) {
-		lobbyDAO = _dao[0]
+		apiObj.lobbyDAO = _dao[0]
 	} else {
-		lobbyDAO = dao.NewLobbyDAO();
+		apiObj.lobbyDAO = dao.NewLobbyDAO();
 	}
 
 	return apiObj
@@ -239,13 +241,9 @@ func NewLobbyAPI(_dao ... *dao.LobbyDAO) *LobbyAPI {
 ///////////////////////////////////////////////////////////////////////////////////////////
 // private
 
-// state
-var apiObj *LobbyAPI
-var lobbyDAO *dao.LobbyDAO
-
 // helpers
-func validatePlayer(playerName string) error {
-	player := lobbyDAO.GetPlayer(playerName)
+func validatePlayer(api *LobbyAPI, playerName string) error {
+	player := api.lobbyDAO.GetPlayer(playerName)
 	if (player == nil) {
 		msg := "Challenged " + playerName + " not found"
 		return errors.New(msg)

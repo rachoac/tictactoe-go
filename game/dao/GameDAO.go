@@ -2,31 +2,37 @@ package dao
 
 import (
 	"github.com/rachoac/tictactoe-go/game/api/model"
-	"encoding/json"
 )
 
 type GameDAO struct {
+	matches map[string]*model.Match
+	matchBoards map[string][]byte
 }
 
-func (dao *GameDAO) GetMatch(matchID string) *model.Match {
-	return
+func (self *GameDAO) GetMatch(matchID string) *model.Match {
+	return self.matches[matchID]
 }
 
-func (dao *GameDAO) CreateMatch(matchID string) {
+func (self *GameDAO) CreateMatch(match *model.Match) {
+	self.matches[match.MatchID] = match
 }
 
-func (dao *GameDAO) UpdateMatch(match *model.Match) {
+func (self *GameDAO) UpdateMatch(match *model.Match) {
+	self.CreateMatch(match)
 }
 
-func (dao* GameDAO) SaveGame( matchID string )
+func (self* GameDAO) SaveGame( matchID string, boardData []byte ) {
+	self.matchBoards[matchID] = boardData;
+}
+
+func (self *GameDAO) GetGame(matchID string) []byte {
+	return self.matchBoards[matchID];
+}
 
 // entry point
 func NewGameDAO() *GameDAO {
-	return
+	daoObj := GameDAO{}
+	daoObj.matches = make(map[string]*model.Match )
+	daoObj.matchBoards = make(map[string][]byte )
+	return &daoObj;
 }
-
-///////////////////////////////////////////////////////////////////////////////////////////
-// private
-
-// state
-var daoObj *GameDAO

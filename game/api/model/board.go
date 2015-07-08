@@ -3,246 +3,258 @@ package model
 import (
 	"errors"
 	"encoding/json"
+	"strconv"
 )
 
 func (self *TicTacToeBoard) Reset() {
-	reset()
+	reset(self)
 }
 
 func (self *TicTacToeBoard) PerformMove(  playerName string, x, y int ) error {
-	err := validateMove(x, y)
-	board[x][y] = playerName;
-	moves++;
-	computeState();
+	err := validateMove(self, x, y)
+	self.board[x][y] = playerName;
+	self.moves++;
+	computeState(self);
 	return err;
 }
 
 func (self *TicTacToeBoard) GetState() string {
-	return state
+	return self.state
 }
 
-func (self *TicTacToeBoard) Serialize() []byte {
-	var object map[string]string
-	object = make(map[string]string)
+func (self *TicTacToeBoard) Serialize() ([]byte, error) {
+	var object map[string]string = make(map[string]string)
 
 	for y := 0; y < 3; y++ {
 		for x := 0; x < 3; x++ {
 			key := makeKey(x, y);
-			value := board[x][y];
-			if ( value != nil ) {
+			value := self.board[x][y];
+			if ( value != "" ) {
 				object[key] = value;
 			}
 		}
 	}
-	object["moves"] = moves
+	object["moves"] = strconv.FormatInt(int64(self.moves), 10)
 	jsonBytes, err := json.Marshal(object)
+
 
 	return jsonBytes, err
 }
 
-func (self *TicTacToeBoard) Deserialize(jsonBytes []byte) {
+func (self *TicTacToeBoard) Deserialize(jsonBytes []byte) error {
 	// bytes -> map
-	var object map[string]string = map[string]string(jsonBytes)
+	var object map[string]string = make( map[string]string )
+	err := json.Unmarshal(jsonBytes, &object)
+	if ( err !=  nil ) {
+		return err
+	}
 
-	reset();
+	reset(self);
+
 	for y := 0; y < 3; y++ {
 		for x := 0; x < 3; x++ {
 			key := makeKey(x, y);
 			value := object[key];
-			if ( value != nil ) {
-				board[x][y] = value;
+			if ( value != "" ) {
+				self.board[x][y] = value;
 			}
 		}
 	}
-	moves = object["moves"];
-	if ( moves == nil ) {
-	 	moves = 0;
+	if ( object["moves"] == "" ) {
+		self.moves = 0;
 	} else {
-		moves = int(moves);
+		self.moves, err = strconv.ParseInt(object["moves"], 10, 32);
 	}
 
-	computeState();
+	computeState(self);
+
+	return nil
 }
 
 func (self *TicTacToeBoard) GetWinner() string {
-	return winner
+	return self.winner
 }
 
 func (self *TicTacToeBoard) ComputeWinner() string {
-	return computeWinner()
+	return computeWinner(self)
 }
 func (self *TicTacToeBoard) GetWinningCells() []string {
-	return winningCells
+	return self.winningCells
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 // private
 
-type TicTacToeBoard struct {}
-
-// state
-var board [][]string
-var moves int
-var winner string
-var winningCells []string
-var state string
+type TicTacToeBoard struct {
+	 board [][]string
+	 moves int64
+	 winner string
+	 winningCells []string
+	 state string
+}
 
 // entry point
 func NewBoard() *TicTacToeBoard {
-	reset()
-	return &(TicTacToeBoard{})
+	theBoard := &(TicTacToeBoard{})
+	reset(theBoard)
+	return theBoard
 }
 
-func reset() {
-	board = nil
-	moves = 0
-	winner = nil
-	winningCells = nil
-	state = "init"
+func reset(self* TicTacToeBoard) {
+	self.board = nil
+	self.moves = 0
+	self.winner = ""
+	self.winningCells = nil
+	self.state = "init"
+
+	self.board = make([][]string, 3)
+	for i := 0; i < 3; i++ {
+		self.board[i] = make([]string, 3)
+	}
 }
 
-func validateMove( x, y int) error {
+func validateMove( self* TicTacToeBoard, x, y int) error {
 	if ( x < 0 || y < 0 ) {
-		errors.New("Out of bounds: " + x + ", " + y);
+		errors.New("Out of bounds: " + strconv.Itoa(x) + ", " + strconv.Itoa(y));
 	}
 
 	if ( x > 3 || y > 3 ) {
-		errors.New("Out of bounds: " + x + ", " + y);
+		errors.New("Out of bounds: " + strconv.Itoa(x) + ", " + strconv.Itoa(y));
 	}
 
-	if ( board[x][y] != nil ) {
-		errors.New("Out of bounds: " + x + ", " + y);
+	if ( self.board[x][y] != "" ) {
+		errors.New("Out of bounds: " + strconv.Itoa(x) + ", " + strconv.Itoa(y));
 	}
 
 	return nil;
 }
 
-func computeState() {
-	winner := computeWinner()
-	if ( winner == nil && moves > 8) {
-		state = "stalemate"
+func computeState(self* TicTacToeBoard) {
+	self.winner = computeWinner(self)
+	if ( self.winner == "" && self.moves > 8) {
+		self.state = "stalemate"
 		return
 	}
-	if ( winner == nil ) {
-		state = "running"
+	if ( self.winner == "" ) {
+		self.state = "running"
 	} else {
-		state = "won"
+		self.state = "won"
 	}
 }
 
-func computeWinner() string {
-	var current string = nil
-	var last string = nil
+func computeWinner(self* TicTacToeBoard) string {
+	var current string = ""
+	var last string = ""
 
 	// check horizontal
 	for y := 0; y < 3; y++ {
 		for x := 0; x < 3; x ++  {
-			current = board[x][y]
-			if ( current == nil ) {
+			current = self.board[x][y]
+			if ( current == "" ) {
 				// empty slot means short circuit row check
 				break
 			}
 
-			if ( last != nil && last != current ) {
+			if ( last != "" && last != current ) {
 				break
 			}
 
 			last = current
 		}
-		if ( last != nil && current != nil && last == current ) {
-			append( winningCells, makeKey(0,y) )
-			append( winningCells, makeKey(1,y) )
-			append( winningCells, makeKey(2,y) )
+		if ( last != "" && current != "" && last == current ) {
+			self.winningCells = append( self.winningCells, makeKey(0,y) )
+			self.winningCells = append( self.winningCells, makeKey(1,y) )
+			self.winningCells = append( self.winningCells, makeKey(2,y) )
 			return last
 		}
 
-		last = nil
+		last = ""
 	}
 
 	// check vertical
-	last = nil
-	current = nil
-	winningCells = nil
+	last = ""
+	current = ""
+	self.winningCells = nil
 	for y := 0; y < 3; y++ {
 		for x := 0; x < 3; x ++ {
-			current = board[y][x];
-			if ( current == nil ) {
+			current = self.board[y][x];
+			if ( current == "" ) {
 				// empty slot means short circuit row check
 				break
 			}
 
-			if ( last != nil && last != current ) {
+			if ( last != "" && last != current ) {
 				break
 			}
 
 			last = current
 		}
-		if ( last != nil && current != nil && last == current ) {
-			append( winningCells, makeKey(y,0) )
-			append( winningCells, makeKey(y,1) )
-			append( winningCells, makeKey(y,2) )
+		if ( last != "" && current != "" && last == current ) {
+			self.winningCells = append( self.winningCells, makeKey(y,0) )
+			self.winningCells = append( self.winningCells, makeKey(y,1) )
+			self.winningCells = append( self.winningCells, makeKey(y,2) )
 			return last
 		}
-		last = nil
+		last = ""
 	}
 
 	// check diagonal
-	last = nil
-	current = nil
-	winningCells = nil
+	last = ""
+	current = ""
+	self.winningCells = nil
 	for i := 0; i < 3; i++ {
-		current = board[i][i];
-		if ( current == nil ) {
+		current = self.board[i][i];
+		if ( current == "" ) {
 		// empty slot means short circuit row check
 			break
 		}
 
-		if ( last != nil && last != current ) {
+		if ( last != "" && last != current ) {
 			break
 		}
 
 		last = current
 		}
-		if ( last != nil && current != nil && last == current ) {
-			append( winningCells, makeKey(0,0) )
-			append( winningCells, makeKey(1,1) )
-			append( winningCells, makeKey(2,2) )
+		if ( last != "" && current != "" && last == current ) {
+			self.winningCells = append( self.winningCells, makeKey(0,0) )
+			self.winningCells = append( self.winningCells, makeKey(1,1) )
+			self.winningCells = append( self.winningCells, makeKey(2,2) )
 			return last
 		}
 
 	// check diagonal
-	last = nil
-	current = nil
-	winningCells = nil
+	last = ""
+	current = ""
+	self.winningCells = nil
 	for i := 2; i >= 0; i-- {
 		x := i
 		y := 2 - i
-		current = board[x][y]
-		if ( current == nil ) {
+		current = self.board[x][y]
+		if ( current == "" ) {
 		// empty slot means short circuit row check
 			break
 		}
 
-		if ( last != nil && last != current ) {
+		if ( last != "" && last != current ) {
 			break
 		}
 
 		last = current
 	}
 
-	if ( last != nil && current != nil && last == current ) {
-		append( winningCells, makeKey(2,0) )
-		append( winningCells, makeKey(1,1) )
-		append( winningCells, makeKey(0,2) )
+	if ( last != "" && current != "" && last == current ) {
+		self.winningCells = append( self.winningCells, makeKey(2,0) )
+		self.winningCells = append( self.winningCells, makeKey(1,1) )
+		self.winningCells = append( self.winningCells, makeKey(0,2) )
 		return last
 	}
 
-	winningCells = nil
-	return nil
+	self.winningCells = nil
+	return ""
 }
 
-func makeKey(x, y string) string {
-	return x + "_" + y
+func makeKey(x, y int) string {
+	return strconv.Itoa(x) + "_" + strconv.Itoa(y)
 }
 
 
